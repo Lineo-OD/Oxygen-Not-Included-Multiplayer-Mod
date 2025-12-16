@@ -1,0 +1,13 @@
+title: "ONI Multiplayer"
+description: "Play Oxygen Not Included together! Host-authoritative multiplayer where each player controls their own duplicants. Uses Steam P2P networking - no port forwarding required."
+version: 0.1.0
+minimumSupportedBuild: 526233
+APIVersion: 2
+
+# Steam Workshop settings (for future publishing)
+# staticID: 0
+# contentSourcePath: release
+
+# Mod author info
+# author: "Your Name"
+# steamAuthorID: 0
