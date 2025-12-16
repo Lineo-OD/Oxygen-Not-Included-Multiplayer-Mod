@@ -1,5 +1,6 @@
 using HarmonyLib;
 using OniMultiplayer.Network;
+using OniMultiplayer.Systems;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,7 +9,8 @@ namespace OniMultiplayer.Patches
     /// <summary>
     /// Patches to control chore assignment in multiplayer.
     /// 
-    /// Design Philosophy:
+    /// HOST-AUTHORITATIVE ARCHITECTURE:
+    /// - Only HOST runs chore logic - clients don't assign chores
     /// - Player-owned dupes ONLY do tasks their owner requested (or survival tasks)
     /// - Unassigned dupes do whatever they want (AI-controlled)
     /// - Survival tasks (eating, sleeping, breathing, etc.) are always allowed
@@ -19,9 +21,8 @@ namespace OniMultiplayer.Patches
     /// </summary>
     public static class ChorePatches
     {
-        private static bool IsConnected => SteamP2PManager.Instance?.IsConnected == true;
-        private static bool IsHost => SteamP2PManager.Instance?.IsHost == true;
-        private static bool IsMultiplayer => IsConnected || IsHost;
+        private static bool IsMultiplayer => ClientMode.IsMultiplayer;
+        private static bool IsHost => ClientMode.IsHost;
 
         // Track which cells have player-owned work requests
         // Cell -> PlayerId

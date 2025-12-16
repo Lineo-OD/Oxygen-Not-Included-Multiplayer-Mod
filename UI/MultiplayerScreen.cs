@@ -963,6 +963,9 @@ namespace OniMultiplayer.UI
             
             // Reset lobby manager state
             SteamLobbyManager.Instance?.ResetGameState();
+            
+            // Reset ClientMode - no longer in multiplayer
+            Systems.ClientMode.Leave();
         }
 
         private void OnPlayerJoined(CSteamID steamId, string name)
@@ -997,6 +1000,16 @@ namespace OniMultiplayer.UI
             
             bool isHost = SteamLobbyManager.Instance?.IsLobbyOwner ?? false;
             OniMultiplayerMod.Log($"[GameStart] isHost={isHost}");
+            
+            // Set ClientMode BEFORE anything else - this determines simulation behavior
+            if (isHost)
+            {
+                Systems.ClientMode.EnterAsHost();
+            }
+            else
+            {
+                Systems.ClientMode.EnterAsClient();
+            }
             
             // Initialize P2P networking
             if (isHost)

@@ -1,5 +1,6 @@
 using HarmonyLib;
 using OniMultiplayer.Network;
+using OniMultiplayer.Systems;
 using UnityEngine;
 using System.Reflection;
 
@@ -9,20 +10,29 @@ namespace OniMultiplayer.Patches
     /// Additional tool patches for common player actions.
     /// All tools inherit from DragTool and override OnDragTool(int cell, int distFromOrigin)
     /// 
+    /// HOST-AUTHORITATIVE ARCHITECTURE:
+    /// - Clients send tool intents to host
+    /// - Host executes the actual game actions
+    /// - Results are broadcast back to clients
+    /// 
     /// NOTE: Only include patches for tools that have been verified to exist.
-    /// Use MethodInspector (F10) to verify tool class names before adding patches.
     /// </summary>
     public static class ToolPatches
     {
         /// <summary>
-        /// Check if we're connected to a multiplayer session.
+        /// Check if we're in a multiplayer session.
         /// </summary>
-        private static bool IsConnected => SteamP2PManager.Instance?.IsConnected == true;
+        private static bool IsMultiplayer => ClientMode.IsMultiplayer;
         
         /// <summary>
         /// Check if we're the host.
         /// </summary>
-        private static bool IsHost => SteamP2PManager.Instance?.IsHost == true;
+        private static bool IsHost => ClientMode.IsHost;
+        
+        /// <summary>
+        /// Check if we're a client.
+        /// </summary>
+        private static bool IsClient => ClientMode.IsClient;
         
         /// <summary>
         /// Send a packet to the host via Steam P2P.
@@ -56,7 +66,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(CancelTool __instance, int cell, int distFromOrigin)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }
@@ -81,7 +91,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(MopTool __instance, int cell, int distFromOrigin)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }
@@ -106,7 +116,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(ClearTool __instance, int cell, int distFromOrigin)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }
@@ -131,7 +141,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(HarvestTool __instance, int cell, int distFromOrigin)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }
@@ -156,7 +166,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(EmptyPipeTool __instance, int cell, int distFromOrigin)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }
@@ -180,7 +190,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(DisconnectTool __instance, Vector3 downPos, Vector3 upPos)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }
@@ -207,7 +217,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(CaptureTool __instance, Vector3 downPos, Vector3 upPos)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }
@@ -234,7 +244,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(PrioritizeTool __instance, int cell, int distFromOrigin)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }

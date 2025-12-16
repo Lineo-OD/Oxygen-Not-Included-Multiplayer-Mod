@@ -1,18 +1,22 @@
 using HarmonyLib;
 using OniMultiplayer.Network;
+using OniMultiplayer.Systems;
 
 namespace OniMultiplayer.Patches
 {
     /// <summary>
     /// Patches to control simulation on clients.
-    /// Clients should NOT run the full simulation - they only render.
-    /// The host runs the authoritative simulation and syncs state.
+    /// 
+    /// HOST-AUTHORITATIVE ARCHITECTURE:
+    /// - Clients should NOT run the full simulation - they only render
+    /// - Host runs the authoritative simulation and syncs state
+    /// - These patches work alongside SimulationSuppression.cs
     /// </summary>
     public static class SimulationPatches
     {
-        private static bool IsConnected => SteamP2PManager.Instance?.IsConnected == true;
-        
-        private static bool IsHost => SteamP2PManager.Instance?.IsHost == true;
+        private static bool IsMultiplayer => ClientMode.IsMultiplayer;
+        private static bool IsHost => ClientMode.IsHost;
+        private static bool IsClient => ClientMode.IsClient;
         
         private static void BroadcastToClients(LiteNetLib.Utils.INetSerializable packet)
         {
@@ -28,7 +32,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(int cell)
             {
-                if (!IsConnected)
+                if (!IsMultiplayer)
                 {
                     return true; // Single player
                 }
@@ -47,7 +51,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(int cell, float amount, int src_cell, string source_name, string pop_text)
             {
-                if (!IsConnected)
+                if (!IsMultiplayer)
                 {
                     return true;
                 }
@@ -64,7 +68,7 @@ namespace OniMultiplayer.Patches
         {
             public static void Postfix(int cell, float mass, float temperature, ushort element_idx, byte disease_idx, int disease_count)
             {
-                if (!IsConnected || !IsHost)
+                if (!IsMultiplayer || !IsHost)
                 {
                     return;
                 }
@@ -83,14 +87,14 @@ namespace OniMultiplayer.Patches
         }
 
         /// <summary>
-        /// Prevent clients from placing buildings directly (must go through host).
+        /// Notify clients when building is placed (host broadcasts).
         /// </summary>
         [HarmonyPatch(typeof(BuildingComplete), "OnSpawn")]
         public static class BuildingComplete_OnSpawn_Patch
         {
             public static void Postfix(BuildingComplete __instance)
             {
-                if (!IsConnected || !IsHost)
+                if (!IsMultiplayer || !IsHost)
                 {
                     return;
                 }
@@ -117,7 +121,7 @@ namespace OniMultiplayer.Patches
         {
             public static void Prefix(BuildingComplete __instance)
             {
-                if (!IsConnected || !IsHost)
+                if (!IsMultiplayer || !IsHost)
                 {
                     return;
                 }

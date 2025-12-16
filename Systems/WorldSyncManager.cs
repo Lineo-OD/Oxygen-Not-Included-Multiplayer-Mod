@@ -1,12 +1,15 @@
 using OniMultiplayer.Network;
+using OniMultiplayer.Systems;
 using UnityEngine;
 
 namespace OniMultiplayer
 {
     /// <summary>
     /// Manages world state syncing between host and clients.
-    /// Host: Sends world chunks on join, broadcasts tile updates.
-    /// Client: Receives and applies world state (render only, no simulation).
+    /// 
+    /// HOST-AUTHORITATIVE ARCHITECTURE:
+    /// - Host: Sends world chunks on join, broadcasts tile updates
+    /// - Client: Receives and applies world state (render only, NO simulation)
     /// </summary>
     public class WorldSyncManager
     {
@@ -25,7 +28,7 @@ namespace OniMultiplayer
         /// </summary>
         public void SendWorldToClient(int playerId)
         {
-            if (SteamP2PManager.Instance?.IsHost != true) return;
+            if (!ClientMode.IsHost) return;
 
             int worldWidth = Grid.WidthInCells;
             int worldHeight = Grid.HeightInCells;
@@ -83,11 +86,29 @@ namespace OniMultiplayer
         }
 
         /// <summary>
+        /// [HOST] Queue a full world sync to all connected clients.
+        /// Called when game first loads to bring clients up to date.
+        /// </summary>
+        public void QueueFullWorldSync()
+        {
+            if (!ClientMode.IsHost) return;
+            
+            OniMultiplayerMod.Log("[Host] Queueing full world sync to all clients");
+            
+            // Send world state to all connected clients
+            foreach (int playerId in SteamP2PManager.Instance.GetAllPlayerIds())
+            {
+                if (playerId == 0) continue; // Skip host
+                SendWorldToClient(playerId);
+            }
+        }
+
+        /// <summary>
         /// [HOST] Broadcast a tile update to all clients.
         /// </summary>
         public void BroadcastTileUpdate(int cell)
         {
-            if (SteamP2PManager.Instance?.IsHost != true) return;
+            if (!ClientMode.IsHost) return;
             if (!Grid.IsValidCell(cell)) return;
 
             var packet = new TileUpdatePacket
@@ -106,7 +127,7 @@ namespace OniMultiplayer
         /// </summary>
         public void BroadcastBuildingState(GameObject building, byte state)
         {
-            if (SteamP2PManager.Instance?.IsHost != true || building == null) return;
+            if (!ClientMode.IsHost || building == null) return;
 
             var kprefab = building.GetComponent<KPrefabID>();
             if (kprefab == null) return;
@@ -131,7 +152,7 @@ namespace OniMultiplayer
         /// </summary>
         public void ApplyWorldChunk(WorldChunkPacket chunk)
         {
-            if (SteamP2PManager.Instance?.IsHost == true) return;
+            if (ClientMode.IsHost) return;
 
             OniMultiplayerMod.Log($"[Client] Applying world chunk at ({chunk.ChunkX}, {chunk.ChunkY}) - {chunk.ChunkWidth}x{chunk.ChunkHeight}");
             
@@ -203,7 +224,7 @@ namespace OniMultiplayer
         /// </summary>
         public void ApplyTileUpdate(TileUpdatePacket packet)
         {
-            if (SteamP2PManager.Instance?.IsHost == true) return;
+            if (ClientMode.IsHost) return;
 
             // Tile updates should be triggered by the simulation on host
             // Client receives notification and can update visuals if needed
@@ -225,7 +246,7 @@ namespace OniMultiplayer
         /// </summary>
         public void ApplyBuildingState(BuildingStatePacket packet)
         {
-            if (SteamP2PManager.Instance?.IsHost == true) return;
+            if (ClientMode.IsHost) return;
 
             switch (packet.State)
             {
@@ -286,7 +307,7 @@ namespace OniMultiplayer
         /// </summary>
         public void PerformDesyncCheck()
         {
-            if (SteamP2PManager.Instance?.IsHost != true) return;
+            if (!ClientMode.IsHost) return;
             if (Game.Instance == null || Grid.WidthInCells == 0) return;
 
             float currentTime = UnityEngine.Time.time;
@@ -311,7 +332,7 @@ namespace OniMultiplayer
         /// </summary>
         public void VerifyChecksum(WorldChecksumPacket packet)
         {
-            if (SteamP2PManager.Instance?.IsHost == true) return;
+            if (ClientMode.IsHost) return;
             if (Game.Instance == null || Grid.WidthInCells == 0) return;
 
             uint localChecksum = CalculateWorldChecksum();

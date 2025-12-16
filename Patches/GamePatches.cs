@@ -143,10 +143,26 @@ namespace OniMultiplayer.Patches
 
         /// <summary>
         /// Initialize multiplayer systems when the game starts.
+        /// In host-authoritative architecture:
+        /// - Host: Normal initialization, then notify clients
+        /// - Client: May be blocked if waiting for host state
         /// </summary>
         [HarmonyPatch(typeof(Game), "OnSpawn")]
         public static class Game_OnSpawn_Patch
         {
+            /// <summary>
+            /// Check if we should block Game.OnSpawn for clients.
+            /// </summary>
+            public static bool Prefix()
+            {
+                if (Systems.GameBootstrapManager.ShouldBlockGameInit())
+                {
+                    OniMultiplayerMod.Log("[Bootstrap] Blocking Game.OnSpawn for client - waiting for host state");
+                    return false;
+                }
+                return true;
+            }
+            
             public static void Postfix()
             {
                 OniMultiplayerMod.Log("Game started - initializing multiplayer systems");
@@ -243,6 +259,12 @@ namespace OniMultiplayer.Patches
                         // Signal that we've loaded
                         SendPlayerLoadedSignal();
                     }
+                    
+                    // HOST: Notify clients that game is ready and send initial state
+                    if (isHost)
+                    {
+                        Systems.GameBootstrapManager.HostGameReady();
+                    }
                 }
             }
         }
@@ -338,6 +360,10 @@ namespace OniMultiplayer.Patches
                 
                 // Reset lobby state so we can start a new game
                 SteamLobbyManager.Instance?.ResetGameState();
+                
+                // Reset ClientMode and GameBootstrap - no longer in multiplayer session
+                Systems.ClientMode.Reset();
+                Systems.GameBootstrapManager.Reset();
                 
                 DupeOwnership.Instance?.Clear();
                 DupeSyncManager.Instance?.Clear();

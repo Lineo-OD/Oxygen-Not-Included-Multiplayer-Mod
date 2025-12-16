@@ -1,13 +1,17 @@
 using System.Collections.Generic;
 using OniMultiplayer.Network;
+using OniMultiplayer.Systems;
 using UnityEngine;
 
 namespace OniMultiplayer
 {
     /// <summary>
     /// Manages syncing dupe state between host and clients.
-    /// Host: Collects and broadcasts dupe states.
-    /// Client: Receives and applies dupe states with LAG COMPENSATION.
+    /// 
+    /// HOST-AUTHORITATIVE ARCHITECTURE:
+    /// - Host: Collects and broadcasts authoritative dupe states
+    /// - Client: Receives and applies dupe states with LAG COMPENSATION
+    /// - Client does NOT run simulation - only displays host state
     /// 
     /// Uses dupe NAMES for network identification (consistent across machines).
     /// 
@@ -44,7 +48,7 @@ namespace OniMultiplayer
         /// </summary>
         public void BroadcastDupeStates()
         {
-            if (SteamP2PManager.Instance?.IsHost != true) return;
+            if (!ClientMode.IsHost) return;
 
             var dupeStates = CollectDupeStates();
             if (dupeStates.Length == 0) return;
@@ -169,7 +173,7 @@ namespace OniMultiplayer
         public void ApplyDupeState(DupeStatePacket packet)
         {
             // Don't apply on host - host has authoritative state
-            if (SteamP2PManager.Instance?.IsHost == true) return;
+            if (ClientMode.IsHost) return;
             if (string.IsNullOrEmpty(packet.DupeName)) return;
 
             // Update network timing
@@ -237,9 +241,9 @@ namespace OniMultiplayer
         /// </summary>
         public void UpdateInterpolation(float deltaTime)
         {
-            // Only run on clients
-            if (SteamP2PManager.Instance?.IsHost == true) return;
-            if (SteamP2PManager.Instance?.IsConnected != true) return;
+            // Only run on clients who are in game
+            if (!ClientMode.IsClient) return;
+            if (!ClientMode.IsClientInGame) return;
 
             float currentTime = Time.time;
 

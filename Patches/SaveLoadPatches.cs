@@ -1,19 +1,23 @@
 using HarmonyLib;
 using OniMultiplayer.Network;
+using OniMultiplayer.Systems;
 
 namespace OniMultiplayer.Patches
 {
     /// <summary>
     /// Patches to control save/load in multiplayer.
-    /// Only the host can save/load. Clients follow host's game state.
+    /// HOST-AUTHORITATIVE ARCHITECTURE:
+    /// - Only host can save/load
+    /// - Clients receive state from host (they don't load saves locally)
     /// </summary>
     public static class SaveLoadPatches
     {
-        private static bool IsConnected => SteamP2PManager.Instance?.IsConnected == true;
-        
-        private static bool IsHost => SteamP2PManager.Instance?.IsHost == true;
+        private static bool IsMultiplayer => ClientMode.IsMultiplayer;
+        private static bool IsHost => ClientMode.IsHost;
+        private static bool IsClient => ClientMode.IsClient;
 
-        // Track if client is loading via GameStartPacket (should be allowed)
+        // Track if client is loading via GameStartPacket (legacy - kept for existing save loading)
+        // In true host-authoritative mode, clients wouldn't load saves at all
         public static bool ClientLoadingFromHost { get; set; } = false;
 
         // Track the current save file path for dupe assignment persistence
@@ -27,37 +31,39 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(string filename, bool isAutoSave, bool updateSavePointer)
             {
-                if (!IsConnected)
+                if (!IsMultiplayer)
                 {
                     return true; // Single player
                 }
 
-                if (!IsHost)
+                if (IsClient)
                 {
                     OniMultiplayerMod.LogWarning("[Client] Cannot save - only host can save the game");
                     return false; // Block client saves
                 }
 
-                // Host: Allow save, maybe notify clients
+                // Host: Allow save
                 OniMultiplayerMod.Log($"[Host] Saving game: {filename}");
                 return true;
             }
         }
 
         /// <summary>
-        /// Prevent clients from loading saves directly (except when loading from host's GameStartPacket).
+        /// Prevent clients from loading saves directly.
+        /// In host-authoritative mode, clients receive state from host.
+        /// The ClientLoadingFromHost flag is kept for backward compatibility.
         /// </summary>
         [HarmonyPatch(typeof(SaveLoader), "Load", typeof(string))]
         public static class SaveLoader_Load_Patch
         {
             public static bool Prefix(string filename)
             {
-                if (!IsConnected)
+                if (!IsMultiplayer)
                 {
                     return true; // Single player
                 }
 
-                // Allow if client is loading in response to GameStartPacket
+                // Allow if client is loading in response to GameStartPacket (legacy flow)
                 if (ClientLoadingFromHost)
                 {
                     OniMultiplayerMod.Log($"[Client] Loading save from host's request: {filename}");
@@ -65,7 +71,7 @@ namespace OniMultiplayer.Patches
                     return true;
                 }
 
-                if (!IsHost)
+                if (IsClient)
                 {
                     OniMultiplayerMod.LogWarning("[Client] Cannot load - only host controls game state");
                     return false;
@@ -77,21 +83,20 @@ namespace OniMultiplayer.Patches
 
         /// <summary>
         /// Disable autosaves on clients - only host should autosave.
-        /// Property: SaveGame.AutoSaveCycleInterval (get/set)
         /// </summary>
         [HarmonyPatch(typeof(SaveGame), "get_AutoSaveCycleInterval")]
         public static class SaveGame_AutoSaveCycleInterval_Patch
         {
             public static bool Prefix(ref int __result)
             {
-                if (!IsConnected)
+                if (!IsMultiplayer)
                 {
                     return true; // Single player - normal autosave
                 }
 
-                if (!IsHost)
+                if (IsClient)
                 {
-                    // Client: Return -1 to disable autosave (or very high number)
+                    // Client: Return -1 to disable autosave
                     __result = -1;
                     return false;
                 }
@@ -99,6 +104,15 @@ namespace OniMultiplayer.Patches
                 // Host: Normal autosave behavior
                 return true;
             }
+        }
+        
+        /// <summary>
+        /// Reset state on cleanup.
+        /// </summary>
+        public static void Clear()
+        {
+            ClientLoadingFromHost = false;
+            CurrentSavePath = null;
         }
     }
 }

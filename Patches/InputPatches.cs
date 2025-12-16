@@ -1,27 +1,30 @@
 using HarmonyLib;
 using OniMultiplayer.Network;
+using OniMultiplayer.Systems;
 using UnityEngine;
 
 namespace OniMultiplayer.Patches
 {
     /// <summary>
     /// Patches for intercepting player input/UI actions.
-    /// Clients: Convert local actions into network intents sent to host.
-    /// Host: Execute actions normally.
+    /// 
+    /// HOST-AUTHORITATIVE ARCHITECTURE:
+    /// - Clients: Convert local actions into network intents sent to host
+    /// - Host: Execute actions normally
     /// 
     /// Method signatures verified via MethodInspector (F10) on ONI build 701625.
     /// </summary>
     public static class InputPatches
     {
         /// <summary>
-        /// Check if we're connected to a multiplayer session.
+        /// Check if we're in a multiplayer session.
         /// </summary>
-        private static bool IsConnected => SteamP2PManager.Instance?.IsConnected == true;
+        private static bool IsMultiplayer => ClientMode.IsMultiplayer;
         
         /// <summary>
         /// Check if we're the host.
         /// </summary>
-        private static bool IsHost => SteamP2PManager.Instance?.IsHost == true;
+        private static bool IsHost => ClientMode.IsHost;
         
         /// <summary>
         /// Send a packet to the host via Steam P2P.
@@ -55,7 +58,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(DigTool __instance, int cell, int distFromOrigin)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     // Host or single-player: execute normally
                     return true;
@@ -82,7 +85,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(BuildTool __instance, int cell, int distFromOrigin)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }
@@ -134,7 +137,7 @@ namespace OniMultiplayer.Patches
                     return true;
                 }
 
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }
@@ -163,7 +166,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(Prioritizable __instance, PrioritySetting priority)
             {
-                if (!IsConnected || IsHost)
+                if (!IsMultiplayer || IsHost)
                 {
                     return true;
                 }

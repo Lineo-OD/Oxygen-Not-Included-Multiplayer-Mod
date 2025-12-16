@@ -1,18 +1,22 @@
 using HarmonyLib;
 using OniMultiplayer.Network;
+using OniMultiplayer.Systems;
 using UnityEngine;
 
 namespace OniMultiplayer.Patches
 {
     /// <summary>
     /// Patches to synchronize game speed across all players.
-    /// Only the host can control speed; clients receive speed updates.
+    /// 
+    /// HOST-AUTHORITATIVE ARCHITECTURE:
+    /// - Only host can change speed
+    /// - Clients send requests, receive confirmations
     /// </summary>
     public static class SpeedControlPatches
     {
-        private static bool IsConnected => SteamP2PManager.Instance?.IsConnected == true;
-        
-        private static bool IsHost => SteamP2PManager.Instance?.IsHost == true;
+        private static bool IsMultiplayer => ClientMode.IsMultiplayer;
+        private static bool IsHost => ClientMode.IsHost;
+        private static bool IsClient => ClientMode.IsClient;
         
         private static void SendToHost(LiteNetLib.Utils.INetSerializable packet)
         {
@@ -32,7 +36,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(SpeedControlScreen __instance, int Speed)
             {
-                if (!IsConnected)
+                if (!IsMultiplayer)
                 {
                     return true; // Single player
                 }
@@ -67,7 +71,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(SpeedControlScreen __instance, bool playsound)
             {
-                if (!IsConnected)
+                if (!IsMultiplayer)
                 {
                     return true;
                 }
@@ -100,7 +104,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(SpeedControlScreen __instance, bool playSound, bool isCrashed)
             {
-                if (!IsConnected)
+                if (!IsMultiplayer)
                 {
                     return true;
                 }
@@ -129,7 +133,7 @@ namespace OniMultiplayer.Patches
         {
             public static bool Prefix(SpeedControlScreen __instance, bool playSound)
             {
-                if (!IsConnected)
+                if (!IsMultiplayer)
                 {
                     return true;
                 }

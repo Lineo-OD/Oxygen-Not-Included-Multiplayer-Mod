@@ -659,45 +659,32 @@ namespace OniMultiplayer
         private static void HandleNewGameStart()
         {
             OniMultiplayerMod.Log("[Client] *** RECEIVED NewGameStartPacket! ***");
-            OniMultiplayerMod.Log("[Client] Host is starting a new game - following to world selection");
+            OniMultiplayerMod.Log("[Client] Host is starting a new game - CLIENT WILL WAIT FOR HOST STATE");
             
-            // First, close the MultiplayerScreen if it's open
-            bool screenWasActive = UI.MultiplayerScreen.Instance != null && UI.MultiplayerScreen.Instance.isActiveAndEnabled;
-            OniMultiplayerMod.Log($"[Client] MultiplayerScreen active: {screenWasActive}");
+            // CRITICAL CHANGE: Clients do NOT start their own game!
+            // In host-authoritative architecture:
+            // - Host generates the world
+            // - Host sends world state to clients
+            // - Clients receive and display that state
             
-            if (screenWasActive)
+            // Notify the bootstrap manager that we're waiting for host state
+            Systems.GameBootstrapManager.ClientReceivedNewGameSignal();
+            
+            // Close the MultiplayerScreen - client will wait for state
+            if (UI.MultiplayerScreen.Instance != null && UI.MultiplayerScreen.Instance.isActiveAndEnabled)
             {
-                OniMultiplayerMod.Log("[Client] Deactivating MultiplayerScreen");
+                OniMultiplayerMod.Log("[Client] Deactivating MultiplayerScreen - waiting for host state");
                 UI.MultiplayerScreen.Instance.Deactivate();
             }
             
-            // Re-enable MainMenu if it was hidden
-            bool mainMenuExists = MainMenu.Instance != null;
-            OniMultiplayerMod.Log($"[Client] MainMenu.Instance exists: {mainMenuExists}");
+            // Show a waiting screen/message to the client
+            UI.MultiplayerNotification.ShowInfo("Host is generating world... Please wait.", 30f);
             
-            if (mainMenuExists)
-            {
-                OniMultiplayerMod.Log("[Client] Setting MainMenu active");
-                MainMenu.Instance.gameObject.SetActive(true);
-                
-                var newGameMethod = typeof(MainMenu).GetMethod("NewGame", 
-                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                    
-                if (newGameMethod != null)
-                {
-                    OniMultiplayerMod.Log("[Client] Invoking MainMenu.NewGame() via reflection...");
-                    newGameMethod.Invoke(MainMenu.Instance, null);
-                    OniMultiplayerMod.Log("[Client] NewGame() invoked successfully!");
-                }
-                else
-                {
-                    OniMultiplayerMod.LogError("[Client] Could not find MainMenu.NewGame method!");
-                }
-            }
-            else
-            {
-                OniMultiplayerMod.LogError("[Client] MainMenu.Instance is null - may already be in game");
-            }
+            // DO NOT call MainMenu.NewGame() on client!
+            // The client will receive world state from the host via WorldChunkPacket
+            // and other state sync packets. The client doesn't run its own simulation.
+            
+            OniMultiplayerMod.Log("[Client] Waiting for host to send world state...");
         }
 
         private static void HandleDupeSelectionComplete()
@@ -866,6 +853,9 @@ namespace OniMultiplayer
         {
             OniMultiplayerMod.Log($"[Client] Host game ready. Time: {packet.GameTime}, Paused: {packet.IsPaused}, Speed: {packet.Speed}");
             
+            // Notify bootstrap manager - client can now enter viewing mode
+            Systems.GameBootstrapManager.ClientReceivedGameReady();
+            
             // Sync game state with host
             if (SpeedControlScreen.Instance != null)
             {
@@ -879,6 +869,9 @@ namespace OniMultiplayer
                     Time.timeScale = packet.Speed;
                 }
             }
+            
+            // Clear waiting notification
+            UI.MultiplayerNotification.ShowSuccess("Connected to host game!", 3f);
         }
 
         /// <summary>

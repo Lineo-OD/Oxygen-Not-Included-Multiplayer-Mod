@@ -1,11 +1,16 @@
 using UnityEngine;
 using OniMultiplayer.Network;
+using OniMultiplayer.Systems;
 
 namespace OniMultiplayer
 {
     /// <summary>
     /// Unity component that calls network updates every frame.
     /// Handles Steam P2P networking and state synchronization.
+    /// 
+    /// HOST-AUTHORITATIVE ARCHITECTURE:
+    /// - Host: Broadcasts authoritative state at tick rate
+    /// - Client: Receives state and updates interpolation (NO simulation)
     /// </summary>
     public class NetworkUpdater : MonoBehaviour
     {
@@ -35,20 +40,21 @@ namespace OniMultiplayer
             // Poll Steam P2P networking (every frame - receives packets)
             SteamP2PManager.Instance?.Update();
 
-            bool isHost = SteamP2PManager.Instance?.IsHost == true;
-            bool isConnected = SteamP2PManager.Instance?.IsConnected == true;
+            // Only process game updates if we're in multiplayer
+            if (!ClientMode.IsMultiplayer) return;
 
-            if (isHost)
+            if (ClientMode.IsHost)
             {
                 // HOST: Broadcast state updates at tick rate
                 UpdateHostBroadcasts();
                 
                 // Update reconnection manager (check for expired disconnections)
-                Systems.ReconnectionManager.Instance?.Update();
+                ReconnectionManager.Instance?.Update();
             }
-            else if (isConnected)
+            else if (ClientMode.IsClient && ClientMode.IsClientInGame)
             {
-                // CLIENT: Update interpolation for smooth dupe movement
+                // CLIENT IN GAME: Update interpolation for smooth dupe movement
+                // Client receives state from host and displays it
                 DupeSyncManager.Instance?.UpdateInterpolation(Time.deltaTime);
             }
         }
