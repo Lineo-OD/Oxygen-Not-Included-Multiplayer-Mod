@@ -2,6 +2,8 @@
 
 **Play Oxygen Not Included together with friends!**
 
+> ⚠️ **Note:** This is in very early pre-alpha stage and still doesn't work properly.
+
 A host-authoritative multiplayer mod for ONI where each player controls their own duplicants in a shared colony. Uses Steam P2P networking - no port forwarding required!
 
 ---
@@ -165,4 +167,3 @@ This mod is provided as-is for personal use with Oxygen Not Included.
 ---
 
 *Made with ❤️ for the ONI community*
-
